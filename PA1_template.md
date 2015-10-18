@@ -1,4 +1,9 @@
-# Reproducible Research: Peer Assessment 1
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
 
 
 
@@ -61,7 +66,7 @@ hist(by_date$steps,
      ylab="Frequency")
 ```
 
-![](PA1_template_files/figure-html/hist1-1.png) 
+![plot of chunk hist1](figure/hist1-1.png) 
 
 This shows the distribution frequency of total steps for the 61 days in the dataset.  Most days are between 10000 and 15000 steps.
 
@@ -118,7 +123,7 @@ plot(by_interval$interval, by_interval$steps,
      ylab="Average steps across all days", main="Average steps by interval across days")
 ```
 
-![](PA1_template_files/figure-html/intplot1-1.png) 
+![plot of chunk intplot1](figure/intplot1-1.png) 
 
 The following finds the interval with the max steps because it is difficult to see from the line. 
 However this is verified by the graph
@@ -168,13 +173,7 @@ the case statement which says that if the value is missing from my main dataset 
 ```r
 imputed <- sqldf("select case when a.steps isnull then i.steps else a.steps end as steps, a.date, a.interval
                  from activity_data a inner join by_interval i on a.interval = i.interval")
-```
 
-```
-## Loading required package: tcltk
-```
-
-```r
 ## convert to data.table
 imputed <- as.data.table(imputed)
 imputed
@@ -222,7 +221,7 @@ hist(by_date_i$steps,
      ylab="Frequency")
 ```
 
-![](PA1_template_files/figure-html/hist2-1.png) 
+![plot of chunk hist2](figure/hist2-1.png) 
 
 Calculate the mean and median of the new data.
 
@@ -308,7 +307,7 @@ ggplot(data = week_analysis, aes(x=interval, y=steps)) + geom_point() + geom_lin
     theme(plot.title = element_text(lineheight=.8, face="bold"))
 ```
 
-![](PA1_template_files/figure-html/wendplot-1.png) 
+![plot of chunk wendplot](figure/wendplot-1.png) 
 
 ### Results analysis
 There is a shift towards later in the day on weekends compared to weekdays.  In general or weekends the steps are more evenly spread whereas on weekdays there is a peak around the 800th interval.
