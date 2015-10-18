@@ -5,21 +5,161 @@ output:
     keep_md: true
 ---
 
+```{r setoptions,echo=FALSE}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+```
+
+## Preparation stages
+This assigment uses the data.table, sqldf and ggplot2 packages
+```{r libraries, results="hide", message=FALSE, warning=FALSE}
+library(data.table)
+library(sqldf)
+library(ggplot2)
+
+```
 
 ## Loading and preprocessing the data
-
+```{r dataloading}
+activity_data <- read.csv("activity.csv")
+activity_data <- as.data.table(activity_data)
+activity_data
+```
 
 
 ## What is mean total number of steps taken per day?
+First sumarize data by date.  Missing values will be ignored later at the mean & median call.
+```{r q1}
+by_date <- activity_data[, .(steps = sum(steps)), by=date]
+head(by_date, 5)
+```
 
+Here is a histogram of steps by date. 
+```{r hist1}
+hist(by_date$steps,
+     main="Steps by date Analysis with NAs",
+     xlab="Steps",
+     ylab="Frequency")
+```
+
+This shows the distribution frequency of total steps for the 61 days in the dataset.  Most days are between 10000 and 15000 steps.
+
+Below are the mean and median for the dataset without considering the missing values. format(md1, 10)`.
+```{r meanmedian1}
+mean(by_date$steps, na.rm = TRUE)
+
+median(by_date$steps, na.rm = TRUE)
+```
 
 
 ## What is the average daily activity pattern?
 
+Summarize the data by interval
+```{r suminterval}
+by_interval <- activity_data[!is.na(steps), .(steps = mean(steps)), by = interval]
+by_interval
+```
+
+Here is a plot of the intervals accross all days.
+
+```{r intplot1}
+plot(by_interval$interval, by_interval$steps,
+     type="l",
+     xlab="Interval",
+     ylab="Average steps across all days", main="Average steps by interval across days")
+```
+
+The following finds the interval with the max steps because it is difficult to see from the line. 
+However this is verified by the graph
+```{r maxint1}
+max_interval <- by_interval[steps == max(by_interval$steps),]
+max_interval
+```
+
+The inerval with the maximum steps is interval `r max_interval$interval` with `r max_interval$steps` steps.
 
 
 ## Imputing missing values
 
+### Counting missing values
+```{r misscount}
+sum(complete.cases(activity_data))
+sum(!is.na(activity_data$steps))
+```
+
+In both cases the number is the same which means that the only observation with missing values is "steps"
+
+### Impute the values
+The selected methodology to impute the missing values is to take the average across all days for the same interval.  
+This makes more sense to me because it assumes that the activity is about the same depending on the time of the day.
+To achieve this, I use the already calculated average by interval and use sqldf to join the data.  Note
+the case statement which says that if the value is missing from my main dataset I take the value from the avergage.
+
+```{r imputemissing}
+imputed <- sqldf("select case when a.steps isnull then i.steps else a.steps end as steps, a.date, a.interval
+                 from activity_data a inner join by_interval i on a.interval = i.interval")
+
+## convert to data.table
+imputed <- as.data.table(imputed)
+imputed
+```
+
+The next step is to summarize the new data by date
+```{r bydate2}
+## sumarize by date on the new data set
+by_date_i <- imputed[, .(steps = sum(steps)), by=date]
+head(by_date_i, 5)
+```
+
+Here is a histogram of the new data with the imputed values.
+
+```{r hist2}
+hist(by_date_i$steps,
+     main="Steps by date Analysis with imputed values",
+     xlab="Steps",
+     ylab="Frequency")
+```
+
+Calculate the mean and median of the new data.
+```{r meanmedian2}
+mean(by_date_i$steps)
+median(by_date_i$steps)
+```
+
+### Effect of imputing missing values
+Apparently because when a day has a missing value, **all** the values of that day are missing, 
+the method chosen created exact copies of them.  They all become the *average day* which 
+which increased the peak of the histogram while the rest remained the same.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Here I create a new factor variable with values weekend and weekday.  I use a combination 
+of the weekdays and ifelse function
+
+```{r wendfactor}
+## create a two level factor with weekdays/weekends
+imputed[, dow := factor(ifelse(weekdays(as.Date(as.character(date),format="%Y-%m-%d")) %in% c("Saturday", "Sunday"), "weekend", "weekday")) ]
+```
+
+Summarize the new data by taking the average steps by interval, dow.
+
+```{r sumintdow}
+week_analysis <- imputed[, .(steps=mean(steps)), by=.(interval, dow)]
+week_analysis
+```
+
+Plot the data for comparison.  It is easier to see the results if the panel is 2 rows, 1 column.
+
+```{r wendplot}
+ggplot(data = week_analysis, aes(x=interval, y=steps)) + geom_point() + geom_line() +
+    facet_grid(dow ~ .) +
+    ggtitle("Average steps per interval - Weekend Vs. weekdays") +  
+    xlab("Interval") + ylab("Steps") +
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+
+
+```
+
+### Results analysis
+There is a shift towards later in the day on weekends compared to weekdays.  In general or weekends the steps are more evenly spread whereas on weekdays there is a peak around the 800th interval.
